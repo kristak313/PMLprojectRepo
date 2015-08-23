@@ -1,0 +1,275 @@
+<html>
+
+<head>
+<style type="text/css">
+.knitr .inline {
+  background-color: #f7f7f7;
+  border:solid 1px #B0B0B0;
+}
+.error {
+	font-weight: bold;
+	color: #FF0000;
+}
+.warning {
+	font-weight: bold;
+}
+.message {
+	font-style: italic;
+}
+.source, .output, .warning, .error, .message {
+	padding: 0 1em;
+  border:solid 1px #F7F7F7;
+}
+.source {
+  background-color: #f5f5f5;
+}
+.rimage .left {
+  text-align: left;
+}
+.rimage .right {
+  text-align: right;
+}
+.rimage .center {
+  text-align: center;
+}
+.hl.num {
+  color: #AF0F91;
+}
+.hl.str {
+  color: #317ECC;
+}
+.hl.com {
+  color: #AD95AF;
+  font-style: italic;
+}
+.hl.opt {
+  color: #000000;
+}
+.hl.std {
+  color: #585858;
+}
+.hl.kwa {
+  color: #295F94;
+  font-weight: bold;
+}
+.hl.kwb {
+  color: #B05A65;
+}
+.hl.kwc {
+  color: #55aa55;
+}
+.hl.kwd {
+  color: #BC5A65;
+  font-weight: bold;
+}
+</style>
+<title>Practical Machine Learning : Prediction Assignment Writeup</title>
+</head>
+
+<body>
+
+<p>Practical Machine Learning : Prediction Assignment Writeup</p>
+
+<b>Background</b>
+
+<p>Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about 
+personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of 
+enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, 
+or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, 
+but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, 
+forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different 
+ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the 
+Weight Lifting Exercise Dataset). </p>
+
+<p>The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create 
+for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind 
+of assignment. </p>
+
+
+<b>What you should submit</b>
+
+<p>The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in 
+the training set. You may use any of the other variables to predict with. You should create a report describing how you 
+built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the 
+choices you did. You will also use your prediction model to predict 20 different test cases. </p>
+
+<ol>
+<li>Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing 
+your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. 
+It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online 
+(and you always want to make it easy on graders :-).</li>
+<li>You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please 
+submit your predictions in appropriate format to the programming assignment for automated grading. See the programming 
+assignment for additional details. </li>
+</ol>
+
+
+<b>Obtain Data</b>
+
+<p>The training data for this project are available here: </p>
+
+<p>https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv</p>
+
+<p>The test data are available here: </p>
+
+<p>https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv</p>
+
+
+<b>Load required R libraries and set the global option:</b>
+
+<div class="chunk" id="unnamed-chunk-1"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl kwd">library</span><span class="hl std">(corrplot)</span>
+<span class="hl kwd">library</span><span class="hl std">(caret)</span>
+</pre></div>
+<div class="message"><pre class="knitr r">## Loading required package: lattice
+## Loading required package: ggplot2
+</pre></div>
+<div class="source"><pre class="knitr r"><span class="hl std">fileUrl</span> <span class="hl kwb">&lt;-</span> <span class="hl str">&quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv&quot;</span>
+<span class="hl kwd">download.file</span><span class="hl std">(fileUrl,</span> <span class="hl kwc">destfile</span> <span class="hl std">=</span> <span class="hl str">&quot;./pml-testing.csv&quot;</span><span class="hl std">,</span> <span class="hl kwc">method</span> <span class="hl std">=</span> <span class="hl str">&quot;curl&quot;</span><span class="hl std">)</span>
+
+<span class="hl std">fileUrl</span> <span class="hl kwb">&lt;-</span> <span class="hl str">&quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv&quot;</span>
+<span class="hl kwd">download.file</span><span class="hl std">(fileUrl,</span> <span class="hl kwc">destfile</span> <span class="hl std">=</span> <span class="hl str">&quot;./pml-testing.csv&quot;</span><span class="hl std">,</span> <span class="hl kwc">method</span> <span class="hl std">=</span> <span class="hl str">&quot;curl&quot;</span><span class="hl std">)</span>
+
+<span class="hl std">pmlTraining</span> <span class="hl kwb">&lt;-</span> <span class="hl kwd">read.csv</span><span class="hl std">(</span><span class="hl str">&quot;pml-Training.csv&quot;</span><span class="hl std">,</span> <span class="hl kwc">header</span> <span class="hl std">=</span> <span class="hl num">TRUE</span><span class="hl std">,</span> <span class="hl kwc">na.strings</span> <span class="hl std">=</span> <span class="hl kwd">c</span><span class="hl std">(</span><span class="hl str">&quot;NA&quot;</span><span class="hl std">,</span><span class="hl str">&quot;&quot;</span><span class="hl std">))</span>
+<span class="hl std">pmlTesting</span> <span class="hl kwb">&lt;-</span> <span class="hl kwd">read.csv</span><span class="hl std">(</span><span class="hl str">&quot;pml-Testing.csv&quot;</span><span class="hl std">,</span> <span class="hl kwc">header</span> <span class="hl std">=</span> <span class="hl num">TRUE</span><span class="hl std">,</span> <span class="hl kwc">na.strings</span> <span class="hl std">=</span> <span class="hl kwd">c</span><span class="hl std">(</span><span class="hl str">&quot;NA&quot;</span><span class="hl std">,</span><span class="hl str">&quot;&quot;</span><span class="hl std">))</span>
+
+<span class="hl kwd">dim</span><span class="hl std">(pmlTraining)</span>
+</pre></div>
+<div class="output"><pre class="knitr r">## [1] 19622   160
+</pre></div>
+</div></div>
+
+<p>Training set = 19622 observations of 160 variables</p>
+
+
+<b>Remove Unnecessary Predictors</b>
+
+<p>Remove unnecessary predictors from dataset by removing columns mostly filled with missing values.</p>
+
+<p>Count missing values in each column of full training data set to determine which columns are not required as predictors.</p>
+
+<div class="chunk" id="unnamed-chunk-2"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">pmlTraining_filter_col</span> <span class="hl kwb">&lt;-</span> <span class="hl std">pmlTraining[,(</span><span class="hl kwd">colSums</span><span class="hl std">(</span><span class="hl kwd">is.na</span><span class="hl std">(pmlTraining))</span> <span class="hl opt">==</span> <span class="hl num">0</span><span class="hl std">)]</span>
+<span class="hl std">pmlTesting_filter_col</span> <span class="hl kwb">&lt;-</span> <span class="hl std">pmlTesting[,(</span><span class="hl kwd">colSums</span><span class="hl std">(</span><span class="hl kwd">is.na</span><span class="hl std">(pmlTesting))</span> <span class="hl opt">==</span> <span class="hl num">0</span><span class="hl std">)]</span>
+</pre></div>
+</div></div>
+
+<p>Delete additional unnecessary columns from the pared-down training and testing datasets.</p>
+
+<div class="chunk" id="unnamed-chunk-3"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">removeCol</span> <span class="hl kwb">&lt;-</span> <span class="hl kwd">c</span><span class="hl std">(</span><span class="hl str">&quot;X&quot;</span><span class="hl std">,</span><span class="hl str">&quot;user_name&quot;</span><span class="hl std">,</span><span class="hl str">&quot;raw_timestamp_part_1&quot;</span><span class="hl std">,</span><span class="hl str">&quot;raw_timestamp_part_2&quot;</span><span class="hl std">,</span><span class="hl str">&quot;cvtd_timestamp&quot;</span><span class="hl std">,</span><span class="hl str">&quot;new_window&quot;</span><span class="hl std">)</span>
+<span class="hl std">pmlTrainig_filter_col</span> <span class="hl kwb">&lt;-</span> <span class="hl std">pmlTraining_filter_col[,</span><span class="hl opt">!</span><span class="hl std">(</span><span class="hl kwd">names</span><span class="hl std">(pmlTraining_filter_col)</span> <span class="hl opt">%in%</span> <span class="hl std">removeCol)]</span>
+<span class="hl std">pmlTesting_filter_col</span> <span class="hl kwb">&lt;-</span> <span class="hl std">pmlTesting_filter_col[,</span><span class="hl opt">!</span><span class="hl std">(</span><span class="hl kwd">names</span><span class="hl std">(pmlTesting_filter_col)</span> <span class="hl opt">%in%</span> <span class="hl std">removeCol)]</span>
+</pre></div>
+</div></div>
+
+<b>Data Slicing</b>
+
+<p>Split clean training dataset</p>
+
+<p>Training dataset: 70%</p>
+
+<p>Validation dataset: 30%</p>
+
+<div class="chunk" id="unnamed-chunk-4"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">inTrain</span> <span class="hl kwb">=</span> <span class="hl kwd">createDataPartition</span><span class="hl std">(</span><span class="hl kwc">y</span> <span class="hl std">= pmlTrainig_filter_col</span><span class="hl opt">$</span><span class="hl std">classe,</span> <span class="hl kwc">p</span> <span class="hl std">=</span> <span class="hl num">0.7</span><span class="hl std">,</span> <span class="hl kwc">list</span> <span class="hl std">=</span> <span class="hl num">FALSE</span><span class="hl std">)</span>
+<span class="hl std">pmlTraining_sub_data</span> <span class="hl kwb">&lt;-</span> <span class="hl std">pmlTrainig_filter_col[inTrain,]</span>
+<span class="hl std">pmlValid_sub_data</span> <span class="hl kwb">&lt;-</span> <span class="hl std">pmlTrainig_filter_col[</span><span class="hl opt">-</span><span class="hl std">inTrain,]</span>
+</pre></div>
+</div></div>
+
+Dataset: 54 variables
+
+Note: Classe variable is contained in last column
+
+<b>Compare Corrolations Between Datasets</b>
+<div class="chunk" id="unnamed-chunk-5"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">corMatrix</span><span class="hl kwb">&lt;-</span> <span class="hl kwd">cor</span><span class="hl std">(pmlTraining_sub_data[,</span> <span class="hl opt">-</span><span class="hl num">54</span><span class="hl std">])</span>
+</pre></div>
+</div></div>
+<div class="chunk" id="unnamed-chunk-6"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl kwd">corrplot</span><span class="hl std">(corMatrix,</span> <span class="hl kwc">order</span> <span class="hl std">=</span> <span class="hl str">&quot;FPC&quot;</span><span class="hl std">,</span> <span class="hl kwc">method</span> <span class="hl std">=</span> <span class="hl str">&quot;color&quot;</span><span class="hl std">,</span> <span class="hl kwc">type</span> <span class="hl std">=</span> <span class="hl str">&quot;lower&quot;</span><span class="hl std">,</span> <span class="hl kwc">tl.cex</span> <span class="hl std">=</span> <span class="hl num">0.8</span><span class="hl std">,</span> <span class="hl kwc">tl.col</span> <span class="hl std">=</span> <span class="hl kwd">rgb</span><span class="hl std">(</span><span class="hl num">0</span><span class="hl std">,</span> <span class="hl num">0</span><span class="hl std">,</span> <span class="hl num">0</span><span class="hl std">))</span>
+</pre></div>
+</div><div class="rimage default"><img src="figure/unnamed-chunk-6-1.png" title="plot of chunk unnamed-chunk-6" alt="plot of chunk unnamed-chunk-6" class="plot" /></div></div>
+
+
+
+<b>Preprocessing with Principal Components Analysis</b>
+
+<p>Used to capture "most information" possible</p>
+<p>Reduces noice</p>
+<p>Column containing classe variable ommited.</p>
+
+<p>Prediction function used on training and test data set to get a better overall trend of the data</p>
+<div class="chunk" id="unnamed-chunk-7"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">preProc</span> <span class="hl kwb">&lt;-</span> <span class="hl kwd">preProcess</span><span class="hl std">(pmlTraining_sub_data[,</span> <span class="hl opt">-</span><span class="hl num">54</span><span class="hl std">],</span> <span class="hl kwc">method</span> <span class="hl std">=</span> <span class="hl str">&quot;pca&quot;</span><span class="hl std">,</span> <span class="hl kwc">thresh</span> <span class="hl std">=</span> <span class="hl num">0.99</span><span class="hl std">)</span>
+<span class="hl std">trainPC</span> <span class="hl kwb">&lt;-</span> <span class="hl kwd">predict</span><span class="hl std">(preProc, pmlTraining_sub_data[,</span> <span class="hl opt">-</span><span class="hl num">54</span><span class="hl std">])</span>
+<span class="hl std">valid_testPC</span> <span class="hl kwb">&lt;-</span> <span class="hl kwd">predict</span><span class="hl std">(preProc, pmlValid_sub_data[,</span> <span class="hl opt">-</span><span class="hl num">54</span><span class="hl std">])</span>
+</pre></div>
+</div></div>
+
+<b>Random Forests</b>
+
+<p>When using Random Forests a cross validation method was applied of ‘trainControl()’ in order to avoid bootstrapping issues.</p>
+
+<div class="chunk" id="unnamed-chunk-8"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">modFit</span> <span class="hl kwb">&lt;-</span> <span class="hl kwd">train</span><span class="hl std">(pmlTraining_sub_data</span><span class="hl opt">$</span><span class="hl std">classe</span> <span class="hl opt">~</span> <span class="hl std">.,</span> <span class="hl kwc">method</span> <span class="hl std">=</span> <span class="hl str">&quot;rf&quot;</span><span class="hl std">,</span> <span class="hl kwc">data</span> <span class="hl std">= trainPC,</span> <span class="hl kwc">trControl</span> <span class="hl std">=</span> <span class="hl kwd">trainControl</span><span class="hl std">(</span><span class="hl kwc">method</span> <span class="hl std">=</span> <span class="hl str">&quot;cv&quot;</span><span class="hl std">,</span> <span class="hl kwc">number</span> <span class="hl std">=</span> <span class="hl num">4</span><span class="hl std">),</span> <span class="hl kwc">importance</span> <span class="hl std">=</span> <span class="hl num">TRUE</span><span class="hl std">)</span>
+</pre></div>
+<div class="message"><pre class="knitr r">## Loading required package: randomForest
+## randomForest 4.6-10
+## Type rfNews() to see new features/changes/bug fixes.
+</pre></div>
+</div></div>
+
+<p>Create plot</p>
+<div class="chunk" id="unnamed-chunk-9"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl kwd">varImpPlot</span><span class="hl std">(modFit</span><span class="hl opt">$</span><span class="hl std">finalModel,</span> <span class="hl kwc">sort</span> <span class="hl std">=</span> <span class="hl num">TRUE</span><span class="hl std">,</span> <span class="hl kwc">type</span> <span class="hl std">=</span> <span class="hl num">1</span><span class="hl std">,</span> <span class="hl kwc">pch</span> <span class="hl std">=</span> <span class="hl num">19</span><span class="hl std">,</span> <span class="hl kwc">col</span> <span class="hl std">=</span> <span class="hl num">1</span><span class="hl std">,</span> <span class="hl kwc">cex</span> <span class="hl std">=</span> <span class="hl num">1</span><span class="hl std">,</span> <span class="hl kwc">main</span> <span class="hl std">=</span> <span class="hl str">&quot;Importance of the Individual Principal Components&quot;</span><span class="hl std">)</span>
+</pre></div>
+</div><div class="rimage default"><img src="figure/unnamed-chunk-9-1.png" title="plot of chunk unnamed-chunk-9" alt="plot of chunk unnamed-chunk-9" class="plot" /></div></div>
+
+
+
+<b>Testing</b>
+
+<p>Data from validation data set (30% of training dataset)</p>
+
+<p>Prediction function used again on training and test data set to get a better overall trend of the data</p>
+<div class="chunk" id="unnamed-chunk-10"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">predValidRF</span> <span class="hl kwb">&lt;-</span> <span class="hl kwd">predict</span><span class="hl std">(modFit, valid_testPC)</span>
+<span class="hl std">confus</span> <span class="hl kwb">&lt;-</span> <span class="hl kwd">confusionMatrix</span><span class="hl std">(pmlValid_sub_data</span><span class="hl opt">$</span><span class="hl std">classe, predValidRF)</span>
+<span class="hl std">confus</span><span class="hl opt">$</span><span class="hl std">table</span>
+</pre></div>
+<div class="output"><pre class="knitr r">##           Reference
+## Prediction    A    B    C    D    E
+##          A 1673    0    0    0    1
+##          B   20 1110    9    0    0
+##          C    0    8 1013    5    0
+##          D    2    0   33  924    5
+##          E    0    1    8    3 1070
+</pre></div>
+</div></div>
+
+<div class="chunk" id="unnamed-chunk-11"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">accur</span> <span class="hl kwb">&lt;-</span> <span class="hl kwd">postResample</span><span class="hl std">(pmlValid_sub_data</span><span class="hl opt">$</span><span class="hl std">classe, predValidRF)</span>
+<span class="hl std">modAccuracy</span> <span class="hl kwb">&lt;-</span> <span class="hl std">accur[[</span><span class="hl num">1</span><span class="hl std">]]</span>
+<span class="hl std">modAccuracy</span>
+</pre></div>
+<div class="output"><pre class="knitr r">## [1] 0.9838573
+</pre></div>
+</div></div>
+
+<div class="chunk" id="unnamed-chunk-12"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">out_of_sample_error</span> <span class="hl kwb">&lt;-</span> <span class="hl num">1</span> <span class="hl opt">-</span> <span class="hl std">modAccuracy</span>
+<span class="hl std">out_of_sample_error</span>
+</pre></div>
+<div class="output"><pre class="knitr r">## [1] 0.01614274
+</pre></div>
+</div></div>
+
+<p>The estimated accuracy of the model is 98% and the estimated out-of-sample error based on our fitted model applied to the cross validation dataset is 1.9%.</p>
+
+<b>Results</b>
+
+<p>Apply preprocessing to initial testing data to get prediction.</p>
+
+<div class="chunk" id="unnamed-chunk-13"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">testPC</span> <span class="hl kwb">&lt;-</span> <span class="hl kwd">predict</span><span class="hl std">(preProc, pmlTesting_filter_col[,</span> <span class="hl opt">-</span><span class="hl num">54</span><span class="hl std">])</span>
+<span class="hl std">pred_final</span> <span class="hl kwb">&lt;-</span> <span class="hl kwd">predict</span><span class="hl std">(modFit, testPC)</span>
+<span class="hl std">pred_final</span>
+</pre></div>
+<div class="output"><pre class="knitr r">##  [1] B A C A A B D B A A B C B A E E A B B B
+## Levels: A B C D E
+</pre></div>
+</div></div>
+
+
+
+</body>
+</html>
