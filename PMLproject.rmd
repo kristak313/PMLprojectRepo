@@ -1,0 +1,190 @@
+<html>
+
+<head>
+#<title>Practical Machine Learning : Prediction Assignment Writeup</title>
+</head>
+
+<body>
+
+<b>Background</b>
+
+<p>Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about 
+personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of 
+enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, 
+or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, 
+but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, 
+forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different 
+ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the 
+Weight Lifting Exercise Dataset). </p>
+
+<p>The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create 
+for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind 
+of assignment. </p>
+
+
+<b>What you should submit</b>
+
+<p>The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in 
+the training set. You may use any of the other variables to predict with. You should create a report describing how you 
+built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the 
+choices you did. You will also use your prediction model to predict 20 different test cases. </p>
+
+<ol>
+<li>Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing 
+your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. 
+It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online 
+(and you always want to make it easy on graders :-).</li>
+<li>You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please 
+submit your predictions in appropriate format to the programming assignment for automated grading. See the programming 
+assignment for additional details. </li>
+</ol>
+
+
+<b>Obtain Data</b>
+
+<p>The training data for this project are available here: </p>
+
+<p>https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv</p>
+
+<p>The test data are available here: </p>
+
+<p>https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv</p>
+
+
+<b>Load required R libraries and set the global option:</b>
+
+<!--begin.rcode
+library(corrplot)
+library(caret)
+
+fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(fileUrl, destfile = "./pml-testing.csv", method = "curl")
+
+fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(fileUrl, destfile = "./pml-testing.csv", method = "curl")
+
+pmlTraining <- read.csv("pml-Training.csv", header = TRUE, na.strings = c("NA",""))
+pmlTesting <- read.csv("pml-Testing.csv", header = TRUE, na.strings = c("NA",""))
+
+dim(pmlTraining)
+end.rcode-->
+
+<p>Training set = 19622 observations of 160 variables</p>
+
+
+<b>Remove Unnecessary Predictors</b>
+
+<p>Remove unnecessary predictors from dataset by removing columns mostly filled with missing values.</p>
+
+<p>Count missing values in each column of full training data set to determine which columns are not required as predictors.</p>
+
+<!--begin.rcode
+pmlTraining_filter_col <- pmlTraining[,(colSums(is.na(pmlTraining)) == 0)]
+pmlTesting_filter_col <- pmlTesting[,(colSums(is.na(pmlTesting)) == 0)]
+end.rcode-->
+
+<p>Delete additional unnecessary columns from the pared-down training and testing datasets.</p>
+
+<!--begin.rcode
+removeCol <- c("X","user_name","raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp","new_window")
+pmlTrainig_filter_col <- pmlTraining_filter_col[,!(names(pmlTraining_filter_col) %in% removeCol)]
+pmlTesting_filter_col <- pmlTesting_filter_col[,!(names(pmlTesting_filter_col) %in% removeCol)]
+end.rcode-->
+
+<b>Data Slicing</b>
+
+<p>Split clean training dataset</p>
+
+<p>Training dataset: 70%</p>
+
+<p>Validation dataset: 30%</p>
+
+<!--begin.rcode
+inTrain = createDataPartition(y = pmlTrainig_filter_col$classe, p = 0.7, list = FALSE)
+pmlTraining_sub_data <- pmlTrainig_filter_col[inTrain,]
+pmlValid_sub_data <- pmlTrainig_filter_col[-inTrain,]
+end.rcode-->
+
+<p>Dataset: 54 variables</p>
+
+<p>Note: Classe variable is contained in last column</p>
+
+<p><b>Compare Corrolations Between Datasets</b></p>
+<!--begin.rcode
+corMatrix<- cor(pmlTraining_sub_data[, -54])
+end.rcode-->
+
+<b>Plot 1 here</b>
+<!--begin.rcode fig.width=7, fig.height=6
+corrplot(corMatrix, order = "FPC", method = "color", type = "lower", tl.cex = 0.8, tl.col = rgb(0, 0, 0))
+end.rcode-->
+
+
+
+<b>Preprocessing with Principal Components Analysis</b>
+
+<p>Used to capture "most information" possible</p>
+<p>Reduces noice</p>
+<p>Column containing classe variable ommited.</p>
+
+<p>Prediction function used on training and test data set to get a better overall trend of the data</p>
+<!--begin.rcode
+preProc <- preProcess(pmlTraining_sub_data[, -54], method = "pca", thresh = 0.99)
+trainPC <- predict(preProc, pmlTraining_sub_data[, -54])
+valid_testPC <- predict(preProc, pmlValid_sub_data[, -54])
+end.rcode-->
+
+<b>Random Forests</b>
+
+<p>When using Random Forests a cross validation method was applied of ‘trainControl()’ in order to avoid bootstrapping issues.</p>
+
+<!--begin.rcode
+modFit <- train(pmlTraining_sub_data$classe ~ ., method = "rf", data = trainPC, trControl = trainControl(method = "cv", number = 4), importance = TRUE)
+end.rcode-->
+
+<p>Create plot</p>
+<b>Plot 2 here</b>
+<!--begin.rcode fig.width=7, fig.height=6
+varImpPlot(modFit$finalModel, sort = TRUE, type = 1, pch = 19, col = 1, cex = 1, main = "Importance of the Individual Principal Components")
+end.rcode-->
+
+
+
+<b>Testing</b>
+
+<p>Data from validation data set (30% of training dataset)</p>
+
+<p>Prediction function used again on training and test data set to get a better overall trend of the data</p>
+<!--begin.rcode
+predValidRF <- predict(modFit, valid_testPC)
+confus <- confusionMatrix(pmlValid_sub_data$classe, predValidRF)
+confus$table
+end.rcode-->
+
+<!--begin.rcode
+accur <- postResample(pmlValid_sub_data$classe, predValidRF)
+modAccuracy <- accur[[1]]
+modAccuracy
+end.rcode-->
+
+<!--begin.rcode
+out_of_sample_error <- 1 - modAccuracy
+out_of_sample_error
+end.rcode-->
+
+<p>The estimated accuracy of the model is 98% and the estimated out-of-sample error based on our fitted model applied to the cross validation dataset is 1.9%.</p>
+
+<b>Results</b>
+
+<p>Apply preprocessing to initial testing data to get prediction.</p>
+
+<!--begin.rcode
+testPC <- predict(preProc, pmlTesting_filter_col[, -54])
+pred_final <- predict(modFit, testPC)
+pred_final
+end.rcode-->
+
+
+
+</body>
+</html>
